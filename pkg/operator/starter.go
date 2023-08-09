@@ -33,9 +33,10 @@ import (
 )
 
 const (
-	operandName        = "manila-csi-driver"
-	operatorName       = "manila-csi-driver-operator"
-	trustedCAConfigMap = "manila-csi-driver-trusted-ca-bundle"
+	operandName           = "manila-csi-driver"
+	operatorName          = "manila-csi-driver-operator"
+	trustedCAConfigMap    = "manila-csi-driver-trusted-ca-bundle"
+	metricsCertSecretName = "manila-csi-driver-controller-metrics-serving-cert"
 
 	nfsImageEnvName = "NFS_DRIVER_IMAGE"
 
@@ -46,6 +47,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	kubeClient := kubeclient.NewForConfigOrDie(rest.AddUserAgent(controllerConfig.KubeConfig, operatorName))
 	kubeInformersForNamespaces := v1helpers.NewKubeInformersForNamespaces(kubeClient, util.OperatorNamespace, util.OperandNamespace, util.CloudConfigNamespace, "")
 	configMapInformer := kubeInformersForNamespaces.InformersFor(util.OperandNamespace).Core().V1().ConfigMaps()
+	secretInformer := kubeInformersForNamespaces.InformersFor(util.OperandNamespace).Core().V1().Secrets()
 	nodeInformer := kubeInformersForNamespaces.InformersFor("").Core().V1().Nodes()
 
 	// Create apiextension client. This is used to verify is a VolumeSnapshotClass CRD exists.
@@ -145,6 +147,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			configMapInformer,
 		),
 		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
+		csidrivercontrollerservicecontroller.WithSecretHashAnnotationHook(util.OperandNamespace, metricsCertSecretName, secretInformer),
 	).WithCSIDriverNodeService(
 		"ManilaDriverNodeServiceController",
 		assetWithNFSDriver,
